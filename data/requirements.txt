@@ -1,0 +1,2 @@
+# No external dependencies required for this module
+# Uses built-in: urllib, json, ssl
