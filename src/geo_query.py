@@ -36,13 +36,53 @@ def fetch_geocode_data(url: str) -> str:
     print(f"Retrieved {len(data)} characters")
     return data
 
+def extract_location_data(raw_json: str) -> dict:
+    """
+    Parses the raw JSON string and extracts lat, lon, formatted address,
+    and place_id from the first matching feature.
+
+    Returns None if no results were found (empty 'features' list).
+    """
+    js = json.loads(raw_json)
+
+    if not js.get("features"):
+        return None
+
+    props = js["features"][0]["properties"]
+
+    return {
+        "lat": props.get("lat"),
+        "lon": props.get("lon"),
+        "formatted_address": props.get("formatted"),
+        "place_id": props.get("place_id"),
+    }
+
+def display_result(location_data: dict):
+    """
+    Prints the extracted location data in a clean, formatted way.
+    If location_data is None, prints a 'not found' message instead.
+    """
+    if location_data is None:
+        print("\n[NO MATCH FOUND]")
+        print("The address you entered could not be located.")
+        return
+
+    print("\n[MATCH FOUND]")
+    print(f"Formatted Address: {location_data['formatted_address']}")
+    print(f"Latitude: {location_data['lat']}")
+    print(f"Longitude: {location_data['lon']}")
+    print(f"Place ID: {location_data['place_id']}")
+
 
 if __name__ == "__main__":
-    test_address = input("Enter location: ").strip()
-    url = build_geocode_url(test_address)
-    print(f"\nRetrieving: {url}")
+    print("--- GEO-LOCATION SERVICE ---")
+    address = input("Enter location: ").strip()
 
+    url = build_geocode_url(address)
     raw_data = fetch_geocode_data(url)
-    print(raw_data[:300])
+    location_data = extract_location_data(raw_data)
+    display_result(location_data)
+
+    print("\n--- TRANSACTION COMPLETE ---")
 
 
