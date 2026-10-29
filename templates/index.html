@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>geo-location-query-system</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div id="map"></div>
+
+  <header class="brand">
+    <h1>geo-location-query-system</h1>
+    <p>Turn any address into coordinates</p>
+  </header>
+
+  <form id="search-form" class="search">
+    <input id="q" type="text" placeholder="Search a place, e.g. Charminar, Hyderabad" autocomplete="off" required>
+    <button type="submit">Search</button>
+  </form>
+
+  <div id="message" class="message hidden"></div>
+
+  <aside id="result" class="card hidden">
+    <h2>Match found</h2>
+    <dl>
+      <dt>Address</dt><dd id="r-address"></dd>
+      <dt>Latitude</dt><dd id="r-lat"></dd>
+      <dt>Longitude</dt><dd id="r-lon"></dd>
+      <dt>Place ID</dt><dd id="r-id" class="break"></dd>
+    </dl>
+  </aside>
+
+  <aside id="trace" class="card trace hidden">
+    <details open>
+      <summary>How your input changed</summary>
+      <ol>
+        <li><span>1. Typed</span><code id="t-typed"></code></li>
+        <li><span>2. Encoded URL</span><code id="t-url"></code></li>
+        <li><span>3. Raw JSON</span><code id="t-json"></code></li>
+        <li><span>4. Extracted</span><code id="t-data"></code></li>
+      </ol>
+    </details>
+  </aside>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // --- Map setup ---
+    const map = L.map('map', {
+      center: [20, 0], zoom: 2, minZoom: 2,
+      worldCopyJump: true, zoomControl: false
+    });
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors', maxZoom: 18
+    }).addTo(map);
+
+    // --- Slow drift until the user touches the map ---
+    let drifting = true;
+    setInterval(() => { if (drifting) map.panBy([1, 0], { animate: false }); }, 40);
+    const stopDrift = () => { drifting = false; };
+    ['mousedown', 'touchstart', 'wheel'].forEach(ev =>
+      map.getContainer().addEventListener(ev, stopDrift, { passive: true }));
+
+    // --- Helpers ---
+    const $ = id => document.getElementById(id);
+    const pinIcon = L.divIcon({
+      className: 'pin', html: '<span></span>',
+      iconSize: [28, 28], iconAnchor: [14, 14]
+    });
+    let marker = null;
+
+    function showMessage(text) {
+      $('message').textContent = text;
+      $('message').classList.remove('hidden');
+    }
+    function hideMessage() { $('message').classList.add('hidden'); }
+
+    function fillTrace(t) {
+      if (!t) { $('trace').classList.add('hidden'); return; }
+      $('t-typed').textContent = t.typed;
+      $('t-url').textContent = t.url;
+      $('t-json').textContent = t.json_chars + ' characters received';
+      $('t-data').textContent = t.extracted
+        ? 'lat ' + t.extracted.lat + ', lon ' + t.extracted.lon
+        : 'nothing found';
+      $('trace').classList.remove('hidden');
+    }
+
+    // --- Search ---
+    $('search-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      stopDrift();
+      const q = $('q').value.trim();
+      if (!q) return;
+
+      showMessage('Searching...');
+      $('result').classList.add('hidden');
+
+      try {
+        const res = await fetch('/search?q=' + encodeURIComponent(q));
+        const data = await res.json();
+        fillTrace(data.trace);
+
+        if (!data.found) { showMessage(data.error); return; }
+
+        const r = data.result;
+        hideMessage();
+        $('r-address').textContent = r.formatted_address;
+        $('r-lat').textContent = r.lat;
+        $('r-lon').textContent = r.lon;
+        $('r-id').textContent = r.place_id;
+        $('result').classList.remove('hidden');
+
+        if (marker) map.removeLayer(marker);
+        const tip = document.createElement('div');
+        tip.textContent = r.formatted_address;
+        marker = L.marker([r.lat, r.lon], { icon: pinIcon }).addTo(map).bindPopup(tip);
+
+        map.flyTo([r.lat, r.lon], 12, { duration: 2.5 });
+        map.once('moveend', () => marker.openPopup());
+      } catch (err) {
+        showMessage('Something went wrong. Please try again.');
+      }
+    });
+  </script>
+</body>
+</html>
