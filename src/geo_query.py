@@ -15,14 +15,15 @@ def build_geocode_url(address: str) -> str:
     """
     Dynamically constructs a web-safe URL for the geocoding API
     by encoding the user's address input.
-
-    Example:
-        Input:  "Charminar, Hyderabad"
-        Output: "http://py4e-data.dr-chuck.net/opengeo?q=Charminar%2C+Hyderabad"
     """
     params = {"q": address}
     encoded_params = urllib.parse.urlencode(params)
     full_url = SERVICE_URL + encoded_params
+
+    print("\n[build_geocode_url]")
+    print(f"  Input  (typed): {address}")
+    print(f"  Output (encoded URL): {full_url}")
+
     return full_url
 
 def fetch_geocode_data(url: str) -> str:
@@ -31,9 +32,13 @@ def fetch_geocode_data(url: str) -> str:
 
     Uses the global SSL context (ctx) to avoid certificate verification issues.
     """
+    print("\n[fetch_geocode_data]")
+    print(f"  Input  (URL received): {url}")
+
     uh = urllib.request.urlopen(url, context=ctx)
     data = uh.read().decode()
-    print(f"Retrieved {len(data)} characters")
+
+    print(f"  Output (raw JSON): {len(data)} characters")
     return data
 
 def extract_location_data(raw_json: str) -> dict:
@@ -43,19 +48,27 @@ def extract_location_data(raw_json: str) -> dict:
 
     Returns None if no results were found (empty 'features' list).
     """
+    print("\n[extract_location_data]")
+    print(f"  Input  (raw JSON): {len(raw_json)} characters")
+
     js = json.loads(raw_json)
 
     if not js.get("features"):
+        print("  Output: no features found -> None")
         return None
 
     props = js["features"][0]["properties"]
 
-    return {
+    result = {
         "lat": props.get("lat"),
         "lon": props.get("lon"),
         "formatted_address": props.get("formatted"),
         "place_id": props.get("place_id"),
     }
+
+    print(f"  Features found: {len(js['features'])} (using the first one)")
+    print(f"  Output (extracted dict): {result}")
+    return result
 
 def display_result(location_data: dict):
     """
